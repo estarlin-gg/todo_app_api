@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Todo_api.Dtos;
 using Todo_api.Models;
 using Todo_api.Services.Abstraction;
 
@@ -27,7 +28,7 @@ namespace Todo_api.Controllers
             }
         }
         [HttpPost]
-        public async Task<IActionResult> CreateTask([FromBody] TodoTask<string> task)
+        public async Task<IActionResult> CreateTask([FromBody] TodoTaskDto<string> task)
         {
             if (!ModelState.IsValid)
             {
@@ -37,20 +38,27 @@ namespace Todo_api.Controllers
             try
             {
                 await _taskService.CreateTask(task);
-                return CreatedAtAction(nameof(GetTasks), new { id = task.Id }, task); 
+                return Ok(task); 
             }
             catch (Exception ex)
             {
                
                 return StatusCode(500, $"Error al crear la tarea: {ex.Message}");
             }
-            finally
+           
+        }
+        [HttpPatch("{id}")]
+        public async Task<IActionResult> EditTask([FromBody] TodoTaskDto<string> todo, int id)
+        {
+            try
             {
-                Console.WriteLine("final jeje");
+                await _taskService.UpdateTask(id, todo);
+                return Ok();
+            }
+            catch (Exception ex) {
+                throw new Exception(ex.Message);
             }
         }
-        //[HttpPatch("{id}")]
-        //public async Task EditTask 
     }
 }
 
