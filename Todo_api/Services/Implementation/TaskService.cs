@@ -4,86 +4,89 @@ using Todo_api.Dtos;
 using Todo_api.Models;
 using Todo_api.Services.Abstraction;
 using Todo_api.Delegates;
+using Todo_api.Factories;
 
-namespace Todo_api.Services.Implementation;
-
-public class TaskService : ITaskService
+namespace Todo_api.Services.Implementation
 {
-    private readonly ToDoContext _toDoContext;
-    private readonly TaskValidator _taskValidator;
-    private readonly TaskNotifier _taskNotifier;
-    private readonly TaskDueDateCalculator _dueDateCalculator;
-
-    public TaskService(ToDoContext toDoContext)
+    public class TaskService : ITaskService
     {
-        _toDoContext = toDoContext;
-        _taskValidator = task => !string.IsNullOrWhiteSpace(task.Description) && task.FechaDeVencimiento > DateTime.Now;
-        _taskNotifier = message => Console.WriteLine($"[Notificación]: {message}");
-        _dueDateCalculator = dueDate => (dueDate - DateTime.Now).Days;
-    }
+        private readonly ToDoContext _toDoContext;
+        private readonly TaskValidator _taskValidator;
+        private readonly TaskNotifier _taskNotifier;
+        private readonly TaskDueDateCalculator _dueDateCalculator;
 
-    public async Task CreateTask(TodoTaskDto<string> taskDto)
-    {
-        var task = new TodoTask<string>
+        public TaskService(ToDoContext toDoContext)
         {
-            Title = taskDto.Title,
-            Description = taskDto.Description,
-            FechaDeVencimiento = taskDto.FechaDeVencimiento,
-            Status = taskDto.Status,
-            Prioridad = taskDto.Prioridad,
-            GenericValue = taskDto.GenericValue
-        };
+            _toDoContext = toDoContext;
+            _taskValidator = task => !string.IsNullOrWhiteSpace(task.Description) && task.FechaDeVencimiento > DateTime.Now;
+            _taskNotifier = message => Console.WriteLine($"[Notificación]: {message}");
+            _dueDateCalculator = dueDate => (dueDate - DateTime.Now).Days;
+        }
 
-        if (!_taskValidator(task))
-            throw new ArgumentException("Tarea inválida.");
-
-        _toDoContext.Tasks.Add(task);
-        await _toDoContext.SaveChangesAsync();
-        _taskNotifier($"Tarea '{task.Title}' creada.");
-    }
-
-    public async Task DeleteTask(int id)
-    {
-        var task = await _toDoContext.Tasks.FindAsync(id);
-        if (task != null)
+        public async Task CreateTask(TodoTaskDto<string> taskDto)
         {
-            _toDoContext.Tasks.Remove(task);
+            TodoTask<string> task;
+
+            if (taskDto.Prioridad == "Alta")
+            {
+                task = TodoTaskFactory.CreateHighPriorityTask(taskDto.Title, taskDto.Description, taskDto.GenericValue);
+            }
+            else
+            {
+                task = TodoTaskFactory.CreateLowPriorityTask(taskDto.Title, taskDto.Description, taskDto.GenericValue);
+            }
+
+            if (!_taskValidator(task))
+                throw new ArgumentException("Tarea inválida.");
+
+            _toDoContext.Tasks.Add(task);
             await _toDoContext.SaveChangesAsync();
-            _taskNotifier($"Tarea '{task.Title}' eliminada.");
+            _taskNotifier($"Tarea '{task.Title}' creada.");
         }
-        else
+
+        public async Task<IEnumerable<object>> GetAllTask()
         {
-            throw new KeyNotFoundException($"Tarea con ID {id} no encontrada.");
+            var tasks = await _toDoContext.Tasks.ToListAsync();
+            return tasks.Select(task => new
+            {
+                task.Id,
+                task.Title,
+                task.Description,
+                task.Status,
+                task.Prioridad,
+                task.GenericValue,
+                DiasRestantes = _dueDateCalculator(task.FechaDeVencimiento)
+            }).ToArray(); 
         }
-    }
 
-    public async Task<IEnumerable<object>> GetAllTask()
-    {
-        var tasks = await _toDoContext.Tasks.ToListAsync();
-        return tasks.Select(task => new
+        public async Task UpdateTask(int id, TodoTaskDto<string> taskDto)
         {
-            task.Id,
-            task.Title,
-            task.Description,
-            task.Status,
-            task.Prioridad,
-            task.GenericValue,
-            DiasRestantes = _dueDateCalculator(task.FechaDeVencimiento)
-        }).ToList();
-    }
+            var searchedTask = await _toDoContext.Tasks.FirstOrDefaultAsync(t => t.Id == id);
+            if (searchedTask == null)
+                throw new KeyNotFoundException($"Tarea con ID {id} no encontrada.");
 
-    public async Task UpdateTask(int id, TodoTaskDto<string> taskDto)
-    {
-        var searchedTask = await _toDoContext.Tasks.FirstOrDefaultAsync(t => t.Id == id);
-        if (searchedTask == null)
-            throw new KeyNotFoundException($"Tarea con ID {id} no encontrada.");
+            searchedTask.Title = taskDto.Title;
+            searchedTask.Description = taskDto.Description;
+            searchedTask.Status = taskDto.Status;
+            searchedTask.Prioridad = taskDto.Prioridad;
+            searchedTask.GenericValue = taskDto.GenericValue;
 
-        searchedTask.Title = taskDto.Title;
-        searchedTask.Description = taskDto.Description;
-        searchedTask.Status = taskDto.Status;
-        searchedTask.Prioridad = taskDto.Prioridad;
-        searchedTask.GenericValue = taskDto.GenericValue;
+            await _toDoContext.SaveChangesAsync();
+        }
 
-        await _toDoContext.SaveChangesAsync();
+        public async Task DeleteTask(int id)
+        {
+            var task = await _toDoContext.Tasks.FindAsync(id);
+            if (task != null)
+            {
+                _toDoContext.Tasks.Remove(task);
+                await _toDoContext.SaveChangesAsync();
+                _taskNotifier($"Tarea '{task.Title}' eliminada.");
+            }
+            else
+            {
+                throw new KeyNotFoundException($"Tarea con ID {id} no encontrada.");
+            }
+        }
     }
 }
