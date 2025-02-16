@@ -1,12 +1,12 @@
 ﻿using Todo_api.Dtos;
-using Todo_api.Models;
 
-namespace Todo_api.Services.Abstraction;
-
-public interface ITaskService
+namespace Todo_api.Services.Abstraction
 {
-    Task CreateTask(TodoTaskDto<string> task);
-    Task<IEnumerable<object>> GetAllTask();
-    Task UpdateTask(int id, TodoTaskDto<string> task);
-    Task DeleteTask(int id);
+    public interface ITaskService
+    {
+        Task<IEnumerable<object>> GetAllTasks();
+        void EnqueueTaskCreation(TodoTaskDto<string> task);
+        void EnqueueTaskUpdate(int id, TodoTaskDto<string> task);
+        void EnqueueTaskDeletion(int id);
+    }
 }

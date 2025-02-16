@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Todo_api.Dtos;
-using Todo_api.Models;
 using Todo_api.Services.Abstraction;
 
 namespace Todo_api.Controllers
@@ -10,55 +9,40 @@ namespace Todo_api.Controllers
     public class TodoController : ControllerBase
     {
         private readonly ITaskService _taskService;
+
         public TodoController(ITaskService taskService)
         {
             _taskService = taskService;
         }
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<TodoTask<string>>>> GetTasks()
-        {
-            try
-            {
-                var tasks = await _taskService.GetAllTask();
-                return Ok(tasks);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Error al obtener las tareas: {ex.Message}");
-            }
-        }
-        [HttpPost]
-        public async Task<IActionResult> CreateTask([FromBody] TodoTaskDto<string> task)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
 
-            try
-            {
-                await _taskService.CreateTask(task);
-                return Ok(task); 
-            }
-            catch (Exception ex)
-            {
-               
-                return StatusCode(500, $"Error al crear la tarea: {ex.Message}");
-            }
-           
-        }
-        [HttpPatch("{id}")]
-        public async Task<IActionResult> EditTask([FromBody] TodoTaskDto<string> todo, int id)
+        [HttpGet]
+        public async Task<IActionResult> GetTasks()
         {
-            try
-            {
-                await _taskService.UpdateTask(id, todo);
-                return Ok();
-            }
-            catch (Exception ex) {
-                throw new Exception(ex.Message);
-            }
+            var tasks = await _taskService.GetAllTasks();
+            return Ok(tasks);
+        }
+
+        [HttpPost]
+        public IActionResult CreateTask([FromBody] TodoTaskDto<string> task)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            _taskService.EnqueueTaskCreation(task);
+            return Ok("Tarea encolada para creación.");
+        }
+
+        [HttpPatch("{id}")]
+        public IActionResult EditTask(int id, [FromBody] TodoTaskDto<string> taskDto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            _taskService.EnqueueTaskUpdate(id, taskDto);
+            return Ok("Tarea encolada para actualización.");
+        }
+
+        [HttpDelete("{id}")]
+        public IActionResult DeleteTask(int id)
+        {
+            _taskService.EnqueueTaskDeletion(id);
+            return Ok("Tarea encolada para eliminación.");
         }
     }
 }
-
