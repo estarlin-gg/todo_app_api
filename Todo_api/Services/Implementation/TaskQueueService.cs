@@ -30,6 +30,7 @@ namespace Todo_api.Services.Implementation
         private async Task ProcessTask(Func<Task> task)
         {
             try
+
             {
                 await task();
             }
