@@ -15,7 +15,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 
-builder.Services.AddScoped<ITaskService,TaskService>();
+builder.Services.AddScoped<CacheService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<TaskQueueService>();
 
 var app = builder.Build();
 
