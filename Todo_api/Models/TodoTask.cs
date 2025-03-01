@@ -9,6 +9,7 @@
         public string Status { get; set; }
         public string Prioridad { get; set; }
         public T GenericValue { get; set; }
+        public string UserId { get; set; }
 
 
 

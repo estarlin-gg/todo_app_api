@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Todo_api.Dtos;
 using Todo_api.Services.Abstraction;
+using System.Threading.Tasks;
 
 namespace Todo_api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TodoController : ControllerBase
     {
         private readonly ITaskService _taskService;
@@ -15,7 +18,6 @@ namespace Todo_api.Controllers
             _taskService = taskService;
         }
 
-   
         [HttpGet]
         public async Task<IActionResult> GetTasks()
         {
@@ -23,7 +25,6 @@ namespace Todo_api.Controllers
             return Ok(tasks);
         }
 
-        // Crear una tarea
         [HttpPost]
         public IActionResult CreateTask([FromBody] TodoTaskDto<string> task)
         {
@@ -32,7 +33,6 @@ namespace Todo_api.Controllers
             return Ok("Tarea encolada para creación.");
         }
 
-      
         [HttpPatch("{id}")]
         public IActionResult EditTask(int id, [FromBody] TodoTaskDto<string> taskDto)
         {
@@ -41,7 +41,6 @@ namespace Todo_api.Controllers
             return Ok("Tarea encolada para actualización.");
         }
 
-       
         [HttpDelete("{id}")]
         public IActionResult DeleteTask(int id)
         {
@@ -49,7 +48,6 @@ namespace Todo_api.Controllers
             return Ok("Tarea encolada para eliminación.");
         }
 
-        
         [HttpGet("completion-rate")]
         public async Task<IActionResult> GetTaskCompletionRate()
         {
@@ -57,7 +55,6 @@ namespace Todo_api.Controllers
             return Ok(new { completionRate = rate });
         }
 
-      
         [HttpGet("filter")]
         public async Task<IActionResult> GetFilteredTasks([FromQuery] string status, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
         {
