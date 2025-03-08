@@ -1,10 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Todo_api.Context;
 using Todo_api.Dtos;
+using Todo_api.Factories;
+using Todo_api.Hubs;
 using Todo_api.Models;
 using Todo_api.Services.Abstraction;
-using Todo_api.Factories;
-using Microsoft.AspNetCore.Http;
 
 namespace Todo_api.Services.Implementation
 {
@@ -14,22 +15,23 @@ namespace Todo_api.Services.Implementation
         private readonly TaskQueueService _taskQueueService;
         private readonly CacheService _cacheService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IHubContext<TaskHub> _hubContext;
 
-        public TaskService(ToDoContext toDoContext, TaskQueueService taskQueueService, CacheService cacheService, IHttpContextAccessor httpContextAccessor)
+        public TaskService(ToDoContext toDoContext, TaskQueueService taskQueueService, CacheService cacheService, IHttpContextAccessor httpContextAccessor, IHubContext<TaskHub> hubContext)
         {
             _toDoContext = toDoContext;
             _taskQueueService = taskQueueService;
             _cacheService = cacheService;
             _httpContextAccessor = httpContextAccessor;
+            _hubContext = hubContext;
         }
 
-        
         public async Task<IEnumerable<object>> GetAllTasks()
         {
-            string userId = _httpContextAccessor.HttpContext.User.Identity.Name;  
+            string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
             var tasks = await _toDoContext.Tasks
-                .Where(task => task.UserId == userId) 
+                .Where(task => task.UserId == userId)
                 .ToListAsync();
 
             return tasks.Select(task => new
@@ -44,30 +46,33 @@ namespace Todo_api.Services.Implementation
             });
         }
 
-       
         public void EnqueueTaskCreation(TodoTaskDto<string> taskDto)
         {
             _taskQueueService.EnqueueTask(async () =>
             {
-                string userId = _httpContextAccessor.HttpContext.User.Identity.Name; 
+                string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
                 var task = TodoTaskFactory.CreateLowPriorityTask(taskDto.Title, taskDto.Description, taskDto.GenericValue);
-                task.UserId = userId;  
+                task.UserId = userId;
 
                 _toDoContext.Tasks.Add(task);
                 await _toDoContext.SaveChangesAsync();
+
+                string message = $"Nueva tarea creada: {task.Title}";
+                Console.WriteLine(message);
+
+                await _hubContext.Clients.All.SendAsync("ReceiveTaskNotification", message);
             });
         }
 
-      
         public void EnqueueTaskUpdate(int id, TodoTaskDto<string> taskDto)
         {
             _taskQueueService.EnqueueTask(async () =>
             {
-                string userId = _httpContextAccessor.HttpContext.User.Identity.Name;  
+                string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
                 var searchedTask = await _toDoContext.Tasks.FindAsync(id);
-                if (searchedTask != null && searchedTask.UserId == userId) 
+                if (searchedTask != null && searchedTask.UserId == userId)
                 {
                     searchedTask.Title = taskDto.Title;
                     searchedTask.Description = taskDto.Description;
@@ -76,30 +81,38 @@ namespace Todo_api.Services.Implementation
                     searchedTask.GenericValue = taskDto.GenericValue;
 
                     await _toDoContext.SaveChangesAsync();
+
+                    string message = $"Tarea actualizada: {searchedTask.Title}";
+                    Console.WriteLine(message);
+
+                    await _hubContext.Clients.All.SendAsync("ReceiveTaskNotification", message);
                 }
             });
         }
 
-        
         public void EnqueueTaskDeletion(int id)
         {
             _taskQueueService.EnqueueTask(async () =>
             {
-                string userId = _httpContextAccessor.HttpContext.User.Identity.Name;  
+                string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
                 var task = await _toDoContext.Tasks.FindAsync(id);
-                if (task != null && task.UserId == userId)  
+                if (task != null && task.UserId == userId)
                 {
                     _toDoContext.Tasks.Remove(task);
                     await _toDoContext.SaveChangesAsync();
+
+                    string message = $"Tarea eliminada: {task.Title}";
+                    Console.WriteLine(message);
+
+                    await _hubContext.Clients.All.SendAsync("ReceiveTaskNotification", message);
                 }
             });
         }
 
-       
         public async Task<double> GetTaskCompletionRate()
         {
-            string userId = _httpContextAccessor.HttpContext.User.Identity.Name; 
+            string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
             return await _cacheService.GetOrAdd("taskCompletionRate", async () =>
             {
@@ -109,10 +122,9 @@ namespace Todo_api.Services.Implementation
             });
         }
 
-    
         public async Task<IEnumerable<object>> GetFilteredTasks(string status = null, DateTime? startDate = null, DateTime? endDate = null)
         {
-            string userId = _httpContextAccessor.HttpContext.User.Identity.Name; 
+            string userId = _httpContextAccessor.HttpContext.User.Identity.Name;
 
             string cacheKey = $"filteredTasks_{status}_{startDate?.ToString()}_{endDate?.ToString()}";
 

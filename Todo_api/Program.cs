@@ -7,6 +7,7 @@ using Todo_api.Services.Abstraction;
 using Todo_api.Services.Implementation;
 using Microsoft.AspNetCore.Identity;
 using Todo_api.Models;
+using Todo_api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,8 @@ builder.Services.AddScoped<CacheService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<TaskQueueService>();
+builder.Services.AddSignalR();
+
 
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -54,11 +57,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<TaskHub>("/taskHub");
 
 app.Run();
